@@ -11,7 +11,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -20,32 +20,27 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
       return;
     }
 
-    const users = JSON.parse(localStorage.getItem('users') || '{}');
+    try {
+      const url = isLogin ? 'http://localhost:4000/login' : 'http://localhost:4000/signup';
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
 
-    if (isLogin) {
-      // Handle Login
-      if (users[username] && users[username].password === password) {
-        onLoginSuccess({
-            username,
-            profile: users[username].profile || null,
-            savedItems: users[username].savedItems || [],
-        });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.message || 'Something went wrong.');
       } else {
-        setError('Invalid username or password.');
+        // שמירת token לשימוש עתידי
+        localStorage.setItem('token', data.token);
+
+        // החזרת המשתמש עם הפרופיל השמור
+        onLoginSuccess(data.user);
       }
-    } else {
-      // Handle Sign Up
-      if (users[username]) {
-        setError('Username already exists.');
-      } else {
-        users[username] = { password, profile: null, savedItems: [] };
-        localStorage.setItem('users', JSON.stringify(users));
-        onLoginSuccess({
-            username,
-            profile: null,
-            savedItems: [],
-        });
-      }
+    } catch (err) {
+      setError('Network error. Please try again.');
     }
   };
 
@@ -56,7 +51,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
           AI Fashion Stylist
         </h1>
         <p className="text-center text-stone-600 mb-6">Your personal style journey starts here.</p>
-        
+
         <div className="flex border-b border-gray-200 mb-6">
           <button
             onClick={() => { setIsLogin(true); setError(''); }}
@@ -74,9 +69,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-stone-700" htmlFor="username">
-              Username
-            </label>
+            <label htmlFor="username" className="block text-sm font-medium text-stone-700">Username</label>
             <input
               type="text"
               id="username"
@@ -86,9 +79,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-stone-700" htmlFor="password">
-              Password
-            </label>
+            <label htmlFor="password" className="block text-sm font-medium text-stone-700">Password</label>
             <input
               type="password"
               id="password"
@@ -100,10 +91,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
 
           {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
-          <button
-            type="submit"
-            className="w-full py-3 px-4 bg-pink-500 text-white font-bold rounded-lg hover:bg-pink-600 transition-colors"
-          >
+          <button type="submit" className="w-full py-3 px-4 bg-pink-500 text-white font-bold rounded-lg hover:bg-pink-600 transition-colors">
             {isLogin ? 'Log In' : 'Create Account'}
           </button>
         </form>
