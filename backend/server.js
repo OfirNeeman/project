@@ -1,20 +1,34 @@
+import 'dotenv/config'; // חייב להיות ראשון!
 import express from 'express';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import bodyParser from 'body-parser';
 import cors from 'cors';
-import multer from 'multer'; // שיניתי לייבוא תקין
+import multer from 'multer';
 import db from './database.js';
-import { analyzeUserImage } from './services/imageAnalysis.js'; // ודאי שהוספת .js בסוף
+import { analyzeUserImage } from './services/imageAnalysis.js';
 
 const app = express();
+const httpServer = createServer(app); // יצירת שרת HTTP עבור Socket.io
+// בתוך server.js
+const io = new Server(httpServer, {
+  cors: {
+    // החלף את הכתובת הזו בכתובת ה-IP של המחשב שלך בפורט שבו רץ ה-Vite
+    origin: "https://192.168.1.149:3000", 
+    // או לצרכי בדיקה בלבד, כדי לאפשר לכל מכשיר: origin: "*"
+    methods: ["GET", "POST"]
+  }
+});
+
 const upload = multer({ storage: multer.memoryStorage() });
 const SECRET_KEY = 'your_secret_key_here';
 
 app.use(cors());
 app.use(bodyParser.json());
 
-// --- פונקציות עזר (נשאר ללא שינוי) ---
+// --- פונקציות עזר ---
 const jsonify = (obj) => (obj === null || obj === undefined) ? null : JSON.stringify(obj);
 
 const parseJson = (str) => {
@@ -39,7 +53,6 @@ const formatUserFromDb = (dbUser) => {
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-  
   if (!token) return res.status(401).json({ message: 'Missing token' });
 
   jwt.verify(token, SECRET_KEY, (err, decoded) => {
@@ -49,21 +62,32 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-/* ----------------------- NEW: UPLOAD & ANALYZE IMAGE ----------------------- */
+// --- ניהול חיבורי Socket ---
+io.on('connection', (socket) => {
+  console.log('משתמש התחבר לסוקט:', socket.id);
+
+  // כאן אפשר להוסיף לוגיקה של סוקטים בעתיד (כמו 'upload_image' שדיברנו עליו)
+  
+  socket.on('disconnect', () => {
+    console.log('משתמש התנתק מהסוקט');
+  });
+});
+
+/* ----------------------- API ROUTES ----------------------- */
+
 app.post('/upload-profile-image', authenticateToken, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No image uploaded' });
     }
 
-    // 1. המרת התמונה ל-Base64 עבור Gemini
     const imageBase64 = req.file.buffer.toString('base64');
     const mimeType = req.file.mimetype;
 
-    // 2. ניתוח ב-Gemini
+    // ניתוח ב-Gemini
     const profileData = await analyzeUserImage(imageBase64, mimeType);
 
-    // 3. עדכון מסד הנתונים (שימי לב: משתמש ב-db.prepare ולא ב-prisma כי זה מה שיש בשרת שלך)
+    // עדכון בסיס הנתונים
     const profileJson = jsonify(profileData);
     db.prepare('UPDATE users SET profile = ? WHERE username = ?')
       .run(profileJson, req.username);
@@ -75,7 +99,6 @@ app.post('/upload-profile-image', authenticateToken, upload.single('image'), asy
   }
 });
 
-/* ----------------------- SIGNUP ----------------------- */
 app.post('/signup', async (req, res) => {
   const { username, password } = req.body;
   try {
@@ -93,7 +116,6 @@ app.post('/signup', async (req, res) => {
   }
 });
 
-/* ----------------------- LOGIN ----------------------- */
 app.post('/login', async (req, res) => {
   const { username, password } = req.body;
   try {
@@ -109,7 +131,6 @@ app.post('/login', async (req, res) => {
   }
 });
 
-/* ----------------------- GET USER ----------------------- */
 app.post('/get-user', (req, res) => {
   const { token } = req.body;
   try {
@@ -122,4 +143,9 @@ app.post('/get-user', (req, res) => {
   }
 });
 
-app.listen(4000, () => console.log('Server running on http://localhost:4000'));
+// שימוש ב-httpServer במקום app.listen כדי שגם הסוקט וגם ה-API יעבדו
+httpServer.listen(4000, "0.0.0.0", () => {
+  console.log('Server running on:');
+  console.log('- Local: http://localhost:4000');
+  console.log('- Network: https://192.168.1.149:4000');
+});

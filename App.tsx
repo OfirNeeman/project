@@ -4,6 +4,9 @@ import { AuthPage } from './components/AuthPage';
 import { ProfileForm } from './components/ProfileForm';
 import { MainApp } from './components/MainApp';
 
+// החלף את הכתובת הזו בכתובת ה-IP של המחשב המארח שלך
+const API_BASE_URL = 'https://192.168.1.149:4000'; 
+
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -18,7 +21,8 @@ const App: React.FC = () => {
       }
 
       try {
-        const response = await fetch('http://localhost:4000/get-user', {
+        // שימוש בכתובת ה-IP במקום localhost
+        const response = await fetch(`${API_BASE_URL}/get-user`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token }),
@@ -46,14 +50,14 @@ const App: React.FC = () => {
     localStorage.removeItem('token');
   };
 
-  // Unified handleProfileComplete
   const handleProfileComplete = async (profile: UserProfile) => {
     if (!currentUser) return;
     const token = localStorage.getItem('token');
     if (!token) return;
 
     try {
-      const response = await fetch('http://localhost:4000/save-profile', {
+      // שימוש בכתובת ה-IP במקום localhost
+      const response = await fetch(`${API_BASE_URL}/save-profile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: currentUser.username, token, profile }),

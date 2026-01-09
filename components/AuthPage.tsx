@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { User } from '../types';
 
+// הגדרת כתובת ה-IP של המחשב שלך
+const API_BASE_URL = 'http://192.168.1.149:4000';
+
 interface AuthPageProps {
   onLoginSuccess: (user: User) => void;
 }
@@ -21,7 +24,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
     }
 
     try {
-      const url = isLogin ? 'http://localhost:4000/login' : 'http://localhost:4000/signup';
+      // שימוש במשתנה API_BASE_URL במקום localhost
+      const endpoint = isLogin ? '/login' : '/signup';
+      const url = `${API_BASE_URL}${endpoint}`;
+      
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -33,10 +39,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
       if (!response.ok) {
         setError(data.message || 'Something went wrong.');
       } else {
-        // שמירת token לשימוש עתידי
         localStorage.setItem('token', data.token);
-
-        // החזרת המשתמש עם הפרופיל השמור
         onLoginSuccess(data.user);
       }
     } catch (err) {
